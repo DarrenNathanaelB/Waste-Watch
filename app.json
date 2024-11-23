@@ -21,8 +21,21 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "permissions": ["ACCESS_FINE_LOCATION"],
+    "android": {
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+      }
+  }
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Kami memerlukan lokasi Anda untuk menampilkan posisi Anda di peta.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Kami memerlukan lokasi Anda untuk menampilkan posisi Anda di peta."
+      }
     },
     "description": "Built by the team behind https://www.instamobile.io https://www.iosapptemplates.com https://www.instaflutter.com and https://www.instakotlin.com",
     "githubUrl": "https://github.com/instamobile/react-native-firebase"
