@@ -4,7 +4,7 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, getDoc, collection } from 'firebase/firestore';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { LoginScreen, HomeScreen, RegistrationScreen } from './src/screens';
+import { OnboardingScreen, LoginScreen, HomeScreen, RegistrationScreen } from './src/screens';
 import LoadScreen from './src/screens/LoadScreen/LoadScreen';
 
 import { decode, encode } from 'base-64';
@@ -75,6 +75,7 @@ export default function App() {
             </Stack.Screen>
         ) : (
           <>
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Registration" component={RegistrationScreen} />
           </>
