@@ -49,25 +49,40 @@
 
 import React from 'react';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Button } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { getAuth, signOut } from 'firebase/auth';
 
 export default function App() {
+  const navigation = useNavigation();
+
   const initialRegion = {
     latitude: -6.3628,         // Latitude for Universitas Indonesia
     longitude: 106.8269,      // Longitude for Universitas Indonesia
     latitudeDelta: 0.01,      // Zoom level (smaller value = closer zoom)
     longitudeDelta: 0.01,     // Zoom level
-  };  
-  
+  };
+
+  const handleLogout = () => {
+    const auth = getAuth();
+    signOut(auth).then(() => {
+      console.log('User signed out!');
+      navigation.navigate('Login'); // Ensure 'Login' is the correct screen name
+    }).catch((error) => {
+      console.error('Error signing out: ', error);
+    });
+  };
+
   return (
-		<View style={{ flex: 1 }}>
-			<MapView 
-          style={StyleSheet.absoluteFill}
-          provider={PROVIDER_GOOGLE} 
-          initialRegion={initialRegion}
-          showsUserLocation
-          showsMyLocationButton={true}
+    <View style={{ flex: 1 }}>
+      <MapView 
+        style={StyleSheet.absoluteFill}
+        provider={PROVIDER_GOOGLE} 
+        initialRegion={initialRegion}
+        showsUserLocation
+        showsMyLocationButton={true}
       />
-		</View>
-	);
-} 
+      <Button title="Log Out" onPress={handleLogout} />
+    </View>
+  );
+}
