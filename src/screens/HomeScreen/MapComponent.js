@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Alert, Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Linking from "expo-linking";
 import { getDatabase, ref, onValue } from "firebase/database";
 import { useNavigation } from "@react-navigation/native";
-import { app } from "../../firebase/config.js"; // Pastikan ini adalah file konfigurasi Firebase Anda
+import { app } from "../../firebase/config.js";
 
-const MapComponent = React.forwardRef((props, ref) => {
+const MapComponent = ({ route }) => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [markers, setMarkers] = useState([]);
   const navigation = useNavigation();
+  const mapRef = useRef(null);
 
   const initialRegion = {
     latitude: -6.3628,
@@ -18,7 +19,21 @@ const MapComponent = React.forwardRef((props, ref) => {
     longitudeDelta: 0.02,
   };
 
-  // Fungsi untuk memuat data dari Firebase
+  // Function to animate to initial region
+  const resetMapPosition = () => {
+    mapRef.current?.animateToRegion(initialRegion, 1000);
+  };
+
+  // Listen for navigation params
+  useEffect(() => {
+    if (route?.params?.resetMap) {
+      resetMapPosition();
+      // Clear the parameter after using it
+      navigation.setParams({ resetMap: undefined });
+    }
+  }, [route?.params?.resetMap]);
+
+  // Your existing useEffect for Firebase data
   useEffect(() => {
     const db = getDatabase(app);
     const rootRef = ref(db, "/");
@@ -47,6 +62,7 @@ const MapComponent = React.forwardRef((props, ref) => {
     return () => unsubscribe();
   }, []);
 
+  // Rest of your existing component code...
   const handleMarkerPress = (marker) => {
     setSelectedMarker(marker);
   };
@@ -54,35 +70,36 @@ const MapComponent = React.forwardRef((props, ref) => {
   const handleNavigateToBin = () => {
     if (selectedMarker) {
       const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedMarker.latitude},${selectedMarker.longitude}`;
-      Linking.openURL(url); // Buka Google Maps
-      setSelectedMarker(null); // Tutup infoContainer
+      Linking.openURL(url);
+      setSelectedMarker(null);
     }
   };
 
   const handleGetBinInfo = () => {
     if (selectedMarker) {
       Alert.alert("Bin Info", `Details for bin: ${selectedMarker.name}`);
-      setSelectedMarker(null); // Tutup infoContainer
+      setSelectedMarker(null);
     }
   };
 
   const handleEmptyBin = () => {
     if (selectedMarker) {
       Alert.alert("Empty Bin", "Bin weight has been reset to 0!");
-      setSelectedMarker(null); // Tutup infoContainer
+      setSelectedMarker(null);
     }
   };
 
   const handleViewDetails = () => {
     if (selectedMarker) {
       navigation.navigate("BinDetailsPage", { binName: selectedMarker.name.toLowerCase() });
-      setSelectedMarker(null); // Tutup infoContainer
+      setSelectedMarker(null);
     }
   };
 
   return (
     <View style={styles.container}>
       <MapView
+        ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={initialRegion}
@@ -106,7 +123,7 @@ const MapComponent = React.forwardRef((props, ref) => {
         <View style={styles.infoContainer}>
           <TouchableOpacity
             style={styles.closeButton}
-            onPress={() => setSelectedMarker(null)} // Tutup infoContainer
+            onPress={() => setSelectedMarker(null)}
           >
             <Text style={styles.closeText}>X</Text>
           </TouchableOpacity>
@@ -124,68 +141,61 @@ const MapComponent = React.forwardRef((props, ref) => {
           <TouchableOpacity style={styles.infoButton} onPress={handleEmptyBin}>
             <Text style={styles.infoButtonText}>Empty Bin</Text>
           </TouchableOpacity>
-          
         </View>
       )}
     </View>
   );
-});
+};
 
+// Add the missing styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
   },
   infoContainer: {
-    position: "absolute",
-    bottom: 120,
+    position: 'absolute',
+    bottom: 100,
     left: 20,
     right: 20,
-    backgroundColor: "#F8E9D3",
-    padding: 15,
+    backgroundColor: '#FFF5E4',
+    padding: 20,
     borderRadius: 10,
-    shadowColor: "#000",
+    elevation: 5,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
   },
   closeButton: {
-    position: "absolute",
+    position: 'absolute',
+    right: 10,
     top: 10,
-    left: 10,
-    backgroundColor: "#f5f5f5",
-    borderRadius: 30,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    justifyContent: "center",
-    alignItems: "center",
+    padding: 5,
   },
   closeText: {
     fontSize: 18,
-    fontWeight: "bold",
-    color: "#555",
+    fontWeight: 'bold',
   },
   infoTitle: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: 'bold',
     marginBottom: 15,
-    textAlign: "center",
+    textAlign: 'center',
   },
   infoButton: {
-    backgroundColor: "#6D4C41",
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
+    backgroundColor: '#6D4C41',
+    padding: 10,
+    borderRadius: 5,
     marginVertical: 5,
-    alignItems: "center",
   },
   infoButtonText: {
-    color: "#fff",
+    color: 'white',
+    textAlign: 'center',
     fontSize: 16,
-    fontWeight: "600",
   },
 });
 
