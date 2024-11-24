@@ -50,33 +50,12 @@
 import React from 'react';
 import { Text, Image, View, StyleSheet, TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import MapComponent from './MapComponent';
 import FinishDayScreen from '../FinishDayScreen/FinishDayScreen';
 import StatisticsScreen from '../StatisticsScreen/StatisticsScreen';
 
 // Bottom Tab Navigator
 const Tab = createBottomTabNavigator();
-
-const MapComponent = () => {
-  const initialRegion = {
-    latitude: -6.3628, // Latitude for Universitas Indonesia
-    longitude: 106.8269, // Longitude for Universitas Indonesia
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  };
-
-  return (
-    <View style={{ flex: 1 }}>
-      <MapView
-        style={StyleSheet.absoluteFill}
-        provider={PROVIDER_GOOGLE}
-        initialRegion={initialRegion}
-        showsUserLocation
-        showsMyLocationButton
-      />
-    </View>
-  );
-};
 
 export default function HomeScreen() {
   return (
@@ -198,5 +177,27 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
     marginTop: 20,
     alignSelf: 'center',
+  },
+
+
+  calloutContainer: {
+    width: 150,
+    padding: 5,
+  },
+  calloutTitle: {
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  calloutButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    marginTop: 5,
+    alignItems: 'center',
+  },
+  calloutButtonText: {
+    color: '#fff',
+    fontSize: 12,
   },
 });
