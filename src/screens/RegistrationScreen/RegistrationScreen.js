@@ -103,7 +103,7 @@ export default function RegistrationScreen({navigation}) {
                 </TouchableOpacity>
                 {/* Footer link to navigate to the login screen */}
                 <View style={styles.footerView}>
-                    <Text style={styles.footerText}>Already got an account? <Text onPress={onFooterLinkPress} style={styles.footerLink}>Log in</Text></Text>
+                    <Text style={styles.footerText}>Already Got An Account? <Text onPress={onFooterLinkPress} style={styles.footerLink}>Log In</Text></Text>
                 </View>
             </KeyboardAwareScrollView>
             <LoadingModal isVisible={isLoading} />

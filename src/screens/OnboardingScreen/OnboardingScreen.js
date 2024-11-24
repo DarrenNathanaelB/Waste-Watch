@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   loginButton: {
     position: "absolute",
     bottom: height * 0.07,
-    backgroundColor: "#000",
+    backgroundColor: '#FFC107',
     paddingVertical: 10,
     paddingHorizontal: 160,
     borderRadius: 25,
