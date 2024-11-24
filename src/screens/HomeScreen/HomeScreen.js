@@ -47,55 +47,78 @@
 //     );
 // }
 
-import React from 'react';
-import { Text, Image, View, StyleSheet, TouchableOpacity } from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import MapComponent from './MapComponent';
-import FinishDayScreen from '../FinishDayScreen/FinishDayScreen';
-import StatisticsScreen from '../StatisticsScreen/StatisticsScreen';
 
-// Bottom Tab Navigator
+import React, { useRef } from "react";
+import { Text, Image, View, StyleSheet, TouchableOpacity } from "react-native";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { useNavigation } from "@react-navigation/native";
+import MapComponent from "./MapComponent";
+import FinishDayScreen from "../FinishDayScreen/FinishDayScreen";
+import StatisticsScreen from "../StatisticsScreen/StatisticsScreen";
+
 const Tab = createBottomTabNavigator();
 
 export default function HomeScreen() {
+  const mapRef = useRef(null); // Ref untuk MapComponent
+  const navigation = useNavigation(); // Akses navigasi
+
   return (
     <View style={{ flex: 1 }}>
       <Tab.Navigator
-        screenOptions={( ) => ({
-          headerShown: false, // No headers for tabs
+        screenOptions={{
+          headerShown: false,
           tabBarStyle: {
-            backgroundColor: '#fffae8',
-            height: 80, // Make navbar taller
-            borderTopLeftRadius: 30, // Rounded corners on top
-            borderTopRightRadius: 30, // Rounded corners on top
-            position: 'absolute', // Position navbar properly
+            backgroundColor: "#fffae8",
+            height: 80,
+            borderTopLeftRadius: 30,
+            borderTopRightRadius: 30,
+            position: "absolute",
             left: 0,
             right: 0,
             bottom: 0,
-            elevation: 10, // Optional: for shadow effect
+            elevation: 10,
           },
-        })}
+        }}
       >
         <Tab.Screen
-          name="Map"
-          component={MapComponent}
+          name="Map" 
+          children={() => <MapComponent ref={mapRef} />}
           options={{
-            tabBarLabel: '',
+            tabBarLabel: "",
             tabBarIcon: ({ focused }) => (
-              <View style={styles.tabItem}>
-                <Image
-                  source={require('../../../assets/home.png')}
-                  style={[
-                    styles.icon,
-                    { tintColor: focused ? '#007AFF' : '#8E8E93', width: 30, height: 30 },
-                  ]}
-                />
-                <View style={styles.labelWrapper}>
-                  <Text style={{ fontSize: 11, marginTop: 4, textAlign: 'center' }}>
-                    Home
-                  </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  navigation.navigate("Home"); // Navigasi ke "Home" sekarang valid
+                  if (mapRef.current) {
+                    mapRef.current.resetToInitialRegion();
+                  }
+                }}
+              >
+                <View style={styles.tabItem}>
+                  <Image
+                    source={require("../../../assets/home.png")}
+                    style={[
+                      styles.icon,
+                      {
+                        tintColor: focused ? "#007AFF" : "#8E8E93",
+                        width: 30,
+                        height: 30,
+                      },
+                    ]}
+                  />
+                  <View style={styles.labelWrapper}>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        marginTop: 4,
+                        textAlign: "center",
+                      }}
+                    >
+                      Home
+                    </Text>
+                  </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             ),
           }}
         />
@@ -103,16 +126,18 @@ export default function HomeScreen() {
           name="Finish Day"
           component={FinishDayScreen}
           options={{
-            tabBarLabel: '',
-            tabBarButton: ( props ) => (
+            tabBarLabel: "",
+            tabBarButton: (props) => (
               <TouchableOpacity
                 {...props}
                 style={[
-                  styles.centerButton, props.style, { backgroundColor: '#ffe8ad' },
-                ]} 
+                  styles.centerButton,
+                  props.style,
+                  { backgroundColor: "#ffe8ad" },
+                ]}
               >
                 <Image
-                  source={require('../../../assets/finishDay.png')}
+                  source={require("../../../assets/finishDay.png")}
                   style={styles.centerIcon}
                 />
               </TouchableOpacity>
@@ -122,19 +147,25 @@ export default function HomeScreen() {
         <Tab.Screen
           name="Statistics"
           component={StatisticsScreen}
-          options={{ 
-            tabBarLabel: '',
+          options={{
+            tabBarLabel: "",
             tabBarIcon: ({ focused }) => (
               <View style={styles.tabItem}>
                 <Image
-                  source={require('../../../assets/statistics.png')}
+                  source={require("../../../assets/statistics.png")}
                   style={[
                     styles.icon,
-                    { tintColor: focused ? '#007AFF' : '#8E8E93', width: 30, height: 30 },
+                    {
+                      tintColor: focused ? "#007AFF" : "#8E8E93",
+                      width: 30,
+                      height: 30,
+                    },
                   ]}
                 />
                 <View style={styles.labelWrapper}>
-                  <Text style={{ fontSize: 11, marginTop: 4, textAlign: 'center' }}>
+                  <Text
+                    style={{ fontSize: 11, marginTop: 4, textAlign: "center" }}
+                  >
                     Stats
                   </Text>
                 </View>
@@ -149,55 +180,33 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   icon: {
-    width: 24, // Default icon size
+    width: 24,
     height: 24,
-    marginTop: 45, 
-    resizeMode: 'contain', // Ensure the icon fits nicely
+    marginTop: 45,
+    resizeMode: "contain",
   },
   centerButton: {
-    position: 'absolute',
-    top: -15, // Mendorong sedikit ke atas
+    position: "absolute",
+    top: -15,
     left: 0,
     right: 0,
     bottom: 0,
-    borderTopLeftRadius: 30, // Rounded corners di bagian atas
+    borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    justifyContent: 'center', // Memusatkan konten secara vertikal
-    alignItems: 'center', // Memusatkan konten secara horizontal
-    zIndex: 1, // Pastikan elemen ini berada di atas elemen lainnya
-    elevation: 5, // Shadow untuk Android
-    shadowColor: '#000',
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
+    elevation: 5,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 3.5,
   },
   centerIcon: {
-    width: 50, // Bigger icon for center button
+    width: 50,
     height: 50,
-    resizeMode: 'contain',
+    resizeMode: "contain",
     marginTop: 20,
-    alignSelf: 'center',
-  },
-
-
-  calloutContainer: {
-    width: 150,
-    padding: 5,
-  },
-  calloutTitle: {
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  calloutButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 5,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    marginTop: 5,
-    alignItems: 'center',
-  },
-  calloutButtonText: {
-    color: '#fff',
-    fontSize: 12,
+    alignSelf: "center",
   },
 });
