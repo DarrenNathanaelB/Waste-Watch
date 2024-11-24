@@ -1,11 +1,15 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Alert, Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-import { markers } from "../../../assets/markers";
 import * as Linking from "expo-linking";
+import { getDatabase, ref, onValue } from "firebase/database";
+import { useNavigation } from "@react-navigation/native";
+import { app } from "../../firebase/config.js"; // Pastikan ini adalah file konfigurasi Firebase Anda
 
 const MapComponent = React.forwardRef((props, ref) => {
   const [selectedMarker, setSelectedMarker] = useState(null);
+  const [markers, setMarkers] = useState([]);
+  const navigation = useNavigation();
 
   const initialRegion = {
     latitude: -6.3628,
@@ -14,42 +18,72 @@ const MapComponent = React.forwardRef((props, ref) => {
     longitudeDelta: 0.02,
   };
 
-  const mapRef = useRef(null); // Ref untuk MapView
-  React.useImperativeHandle(ref, () => ({
-    resetToInitialRegion: () => {
-      mapRef.current.animateToRegion(initialRegion, 1000);
-    },
-  }));
+  // Fungsi untuk memuat data dari Firebase
+  useEffect(() => {
+    const db = getDatabase(app);
+    const rootRef = ref(db, "/");
+
+    const unsubscribe = onValue(rootRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const markerData = Object.keys(data)
+          .filter((key) => key.startsWith("tong"))
+          .map((key) => {
+            const sensor = data[key]?.sensor;
+            return {
+              name: key.toUpperCase(),
+              latitude: sensor?.latitude || 0,
+              longitude: sensor?.longitude || 0,
+              battery: sensor?.battery || 0,
+              weight: sensor?.weight || 0,
+            };
+          });
+        setMarkers(markerData);
+      } else {
+        console.log("No data available");
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleMarkerPress = (marker) => {
     setSelectedMarker(marker);
   };
 
-  const handleNavigateToBin = (marker) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${marker.latitude},${marker.longitude}`;
-    Linking.openURL(url);
-    closeInfoContainer();
+  const handleNavigateToBin = () => {
+    if (selectedMarker) {
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedMarker.latitude},${selectedMarker.longitude}`;
+      Linking.openURL(url); // Buka Google Maps
+      setSelectedMarker(null); // Tutup infoContainer
+    }
   };
 
   const handleGetBinInfo = () => {
-    Alert.alert("Bin Info", `Details for bin: ${selectedMarker.name}`);
-    closeInfoContainer();
+    if (selectedMarker) {
+      Alert.alert("Bin Info", `Details for bin: ${selectedMarker.name}`);
+      setSelectedMarker(null); // Tutup infoContainer
+    }
   };
 
   const handleEmptyBin = () => {
-    Alert.alert("Empty Bin", "Bin weight has been reset to 0!");
-    closeInfoContainer();
+    if (selectedMarker) {
+      Alert.alert("Empty Bin", "Bin weight has been reset to 0!");
+      setSelectedMarker(null); // Tutup infoContainer
+    }
   };
 
-  const closeInfoContainer = () => {
-    setSelectedMarker(null);
+  const handleViewDetails = () => {
+    if (selectedMarker) {
+      navigation.navigate("BinDetailsPage", { binName: selectedMarker.name.toLowerCase() });
+      setSelectedMarker(null); // Tutup infoContainer
+    }
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.container}>
       <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFill}
+        style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={initialRegion}
         showsUserLocation
@@ -59,7 +93,10 @@ const MapComponent = React.forwardRef((props, ref) => {
           <Marker
             key={index}
             title={marker.name}
-            coordinate={marker}
+            coordinate={{
+              latitude: marker.latitude,
+              longitude: marker.longitude,
+            }}
             onPress={() => handleMarkerPress(marker)}
           />
         ))}
@@ -67,25 +104,27 @@ const MapComponent = React.forwardRef((props, ref) => {
 
       {selectedMarker && (
         <View style={styles.infoContainer}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={closeInfoContainer}>
-              <Text style={styles.closeText}>X</Text>
-            </TouchableOpacity>
-            <Text style={styles.infoTitle}>{selectedMarker.name}</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setSelectedMarker(null)} // Tutup infoContainer
+          >
+            <Text style={styles.closeText}>X</Text>
+          </TouchableOpacity>
 
+          <Text style={styles.infoTitle}>{selectedMarker.name}</Text>
           <TouchableOpacity
             style={styles.infoButton}
-            onPress={() => handleNavigateToBin(selectedMarker)}
+            onPress={handleNavigateToBin}
           >
             <Text style={styles.infoButtonText}>Navigate to Bin</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.infoButton} onPress={handleGetBinInfo}>
+          <TouchableOpacity style={styles.infoButton} onPress={handleViewDetails}>
             <Text style={styles.infoButtonText}>Get Bin Info</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.infoButton} onPress={handleEmptyBin}>
             <Text style={styles.infoButtonText}>Empty Bin</Text>
           </TouchableOpacity>
+          
         </View>
       )}
     </View>
@@ -93,12 +132,18 @@ const MapComponent = React.forwardRef((props, ref) => {
 });
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
   infoContainer: {
     position: "absolute",
-    bottom: 120, // Distance from the bottom (above the navbar)
+    bottom: 120,
     left: 20,
     right: 20,
-    backgroundColor: "white",
+    backgroundColor: "#F8E9D3",
     padding: 15,
     borderRadius: 10,
     shadowColor: "#000",
@@ -107,27 +152,30 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  header: {
-    flexDirection: "row", // Membuat nama dan tombol X berada dalam satu baris
-    justifyContent: "space-between", // Mengatur tombol X ke sebelah kanan
-    alignItems: "center", // Menjaga agar nama dan tombol X sejajar secara vertikal
+  closeButton: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    backgroundColor: "#f5f5f5",
+    borderRadius: 30,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
   closeText: {
-    fontSize: 14, 
+    fontSize: 18,
+    fontWeight: "bold",
     color: "#555",
-    marginBottom: 10,
-    left: 5, // Mendorong tombol X ke kiri
   },
   infoTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 10,
-    textAlign: "center", // Agar nama berada di tengah secara horizontal
-    left: -5, // Mendorong nama ke kiri
-    flex: 1, // Mengambil ruang yang tersisa di tengah
+    marginBottom: 15,
+    textAlign: "center",
   },
   infoButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#6D4C41",
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 15,
