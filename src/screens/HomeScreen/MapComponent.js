@@ -5,6 +5,8 @@ import * as Linking from "expo-linking";
 import { getDatabase, ref, onValue } from "firebase/database";
 import { useNavigation } from "@react-navigation/native";
 import { app } from "../../firebase/config.js";
+import Icon from 'react-native-vector-icons/Ionicons';
+import { getAuth, signOut } from 'firebase/auth';
 
 const MapComponent = ({ route }) => {
   const [selectedMarker, setSelectedMarker] = useState(null);
@@ -96,8 +98,21 @@ const MapComponent = ({ route }) => {
     }
   };
 
+  const handleLogout = () => {
+    const auth = getAuth();
+    signOut(auth).then(() => {
+      console.log('User signed out!');
+      navigation.navigate('Login');
+    }).catch((error) => {
+      console.error('Error signing out: ', error);
+    });
+  };
+
   return (
     <View style={styles.container}>
+      <TouchableOpacity onPress={handleLogout} style={styles.logoutIcon}>
+          <Icon name="arrow-back" size={24} color="#866A42" />
+      </TouchableOpacity>
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -196,6 +211,16 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     fontSize: 16,
+  },
+  logoutIcon: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    zIndex: 10,
+    backgroundColor: '#ffe8ad',
+    borderRadius: 20,
+    padding: 5,
+    elevation: 5,
   },
 });
 

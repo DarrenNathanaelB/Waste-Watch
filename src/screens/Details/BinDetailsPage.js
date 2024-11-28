@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
-import { getDatabase, ref, onValue } from "firebase/database";
+import { getDatabase, ref, onValue, set } from "firebase/database";
 import { app } from '../../firebase/config';
 import { useRoute } from "@react-navigation/native";
 
@@ -22,6 +22,25 @@ const BinDetailsPage = () => {
     return () => unsubscribe();
   }, [binName]); // Memastikan useEffect berjalan ulang jika binName berubah
 
+  const handleCloseBinToggle = async () => {
+    if (binData && binData.closebin !== undefined) {
+      const db = getDatabase(app);
+      const binRef = ref(db, `${binName}/sensor/closebin`);
+
+      // Toggle nilai closebin
+      const newClosebinValue = binData.closebin === 1 ? 0 : 1;
+
+      try {
+        await set(binRef, newClosebinValue); // Update field closebin di database
+        setBinData({ ...binData, closebin: newClosebinValue }); // Perbarui state lokal
+      } catch (error) {
+        console.error("Error updating closebin:", error);
+      }
+    } else {
+      console.error("closebin property is missing from binData");
+    }
+  };
+
   if (!binData) {
     return (
       <View style={styles.container}>
@@ -30,7 +49,7 @@ const BinDetailsPage = () => {
     );
   }
 
-  const { battery, distance, weight } = binData;
+  const { battery, distance, weight, closebin } = binData;
 
   // Menghitung kapasitas bar berdasarkan jarak
   const maxDistance = 100; // Asumsi jarak maksimum adalah 100 (ubah sesuai dengan sensornya)
@@ -66,8 +85,17 @@ const BinDetailsPage = () => {
         <Text style={styles.value}>{weight} Kg</Text>
       </View>
 
-      <TouchableOpacity style={styles.closeButton}>
-        <Text style={styles.closeButtonText}>Close Bin</Text>
+      <View style={styles.infoContainer}>
+        <Text style={styles.label}>Bin Status:</Text>
+        <Text style={styles.value}>
+          {closebin === 1 ? "Closed" : "Open"}
+        </Text>
+      </View>
+
+      <TouchableOpacity style={styles.closeButton} onPress={handleCloseBinToggle}>
+        <Text style={styles.closeButtonText}>
+          {closebin === 1 ? "Open Bin" : "Close Bin"}
+        </Text>
       </TouchableOpacity>
     </ScrollView>
   );

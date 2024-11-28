@@ -1,8 +1,6 @@
 import React from 'react';
 import { Text, Image, View, StyleSheet, TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { getAuth, signOut } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import MapComponent from './MapComponent';
 import FinishDayScreen from '../FinishDayScreen/FinishDayScreen';
@@ -13,22 +11,8 @@ const Tab = createBottomTabNavigator();
 export default function HomeScreen() {
   const navigation = useNavigation();
 
-  const handleLogout = () => {
-    const auth = getAuth();
-    signOut(auth).then(() => {
-      console.log('User signed out!');
-      navigation.navigate('Login');
-    }).catch((error) => {
-      console.error('Error signing out: ', error);
-    });
-  };
-
   return (
     <View style={{ flex: 1 }}>
-      <TouchableOpacity onPress={handleLogout} style={styles.logoutIcon}>
-          <Icon name="arrow-back" size={24} color="#866A42" />
-      </TouchableOpacity>
-
       <Tab.Navigator
         screenOptions={({ navigation, route }) => ({
           headerShown: false,
@@ -148,16 +132,3 @@ export default function HomeScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  logoutIcon: {
-      position: 'absolute',
-      top: 10,
-      left: 10,
-      zIndex: 10,
-      backgroundColor: '#ffe8ad',
-      borderRadius: 20,
-      padding: 5,
-      elevation: 5,
-  },
-});
