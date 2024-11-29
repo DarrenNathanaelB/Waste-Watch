@@ -98,7 +98,7 @@ export default function HomeScreen() {
       });
     } catch (error) {
       console.error("Error saving historical data:", error);
-      Alert.alert("Error", "Failed to save historical data");
+      Alert.alert("Error", "Gagal menyimpan historical data");
     }
   };
 
@@ -128,7 +128,7 @@ export default function HomeScreen() {
       return [];
     } catch (error) {
       console.error("Error fetching current weights:", error);
-      Alert.alert("Error", "Failed to fetch current weights");
+      Alert.alert("Error", "Gagal mendapatkan current weights");
       return [];
     }
   };

@@ -70,7 +70,7 @@ const StatisticsPage = () => {
       }
     }, (error) => {
       console.error("Error fetching leaderboard data:", error);
-      Alert.alert("Error", "Failed to fetch leaderboard data");
+      Alert.alert("Error", "Gagal mendapatkan leaderboard data");
     });
   };
 

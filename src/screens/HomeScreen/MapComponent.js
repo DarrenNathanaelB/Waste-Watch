@@ -1,16 +1,27 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Alert, Text, View, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  Alert,
+  Text,
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+} from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Linking from "expo-linking";
-import { getDatabase, ref, onValue } from "firebase/database";
+import { getDatabase, get, ref, onValue, update } from "firebase/database";
 import { useNavigation } from "@react-navigation/native";
 import { app } from "../../firebase/config.js";
-import Icon from 'react-native-vector-icons/Ionicons';
-import { getAuth, signOut } from 'firebase/auth';
+import Icon from "react-native-vector-icons/Ionicons";
+import { getAuth, signOut } from "firebase/auth";
 
 const MapComponent = ({ route }) => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [markers, setMarkers] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [currentWeight, setCurrentWeight] = useState(null);
+  const [thresholdReached, setThresholdReached] = useState(false);
+  const [initialWeight, setInitialWeight] = useState(null);
   const navigation = useNavigation();
   const mapRef = useRef(null);
 
@@ -21,21 +32,17 @@ const MapComponent = ({ route }) => {
     longitudeDelta: 0.02,
   };
 
-  // Function to animate to initial region
   const resetMapPosition = () => {
     mapRef.current?.animateToRegion(initialRegion, 1000);
   };
 
-  // Listen for navigation params
   useEffect(() => {
     if (route?.params?.resetMap) {
       resetMapPosition();
-      // Clear the parameter after using it
       navigation.setParams({ resetMap: undefined });
     }
   }, [route?.params?.resetMap]);
 
-  // Your existing useEffect for Firebase data
   useEffect(() => {
     const db = getDatabase(app);
     const rootRef = ref(db, "/");
@@ -64,11 +71,84 @@ const MapComponent = ({ route }) => {
     return () => unsubscribe();
   }, []);
 
-  // Rest of your existing component code...
   const handleMarkerPress = (marker) => {
     setSelectedMarker(marker);
   };
 
+  const handleEmptyBin = () => {
+    if (selectedMarker) {
+      const db = getDatabase(app);
+      const binRef = ref(db, `${selectedMarker.name.toLowerCase()}/sensor`);
+  
+      // Dapatkan data dari database sekali
+      get(binRef).then((snapshot) => {
+        if (snapshot.exists()) {
+          const weight = snapshot.val()?.weight || 0;
+          if (initialWeight === null) {
+            setInitialWeight(weight); // Simpan berat awal hanya sekali
+          }
+        } else {
+          Alert.alert("Error", "Data not available.");
+        }
+      });
+
+      onValue(binRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const weight = snapshot.val()?.weight || 0;
+  
+          setCurrentWeight(weight); // Set berat saat ini
+          setThresholdReached(weight < 1); // Cek apakah berat di bawah threshold
+        } else {
+          Alert.alert("Error", "Data not available.");
+        }
+      });
+  
+      setModalVisible(true); // Tampilkan modal
+    }
+  };
+  
+  const handleConfirmEmptyBin = () => {
+    if (selectedMarker) {
+      const db = getDatabase(app);
+      const binRef = ref(db, `${selectedMarker.name.toLowerCase()}/sensor`);
+  
+      // Dapatkan data dari database sekali
+      get(binRef).then((snapshot) => {
+        if (snapshot.exists()) {
+          const currentData = snapshot.val();
+          const finalWeight = currentData?.weight || 0; // Berat setelah pengosongan
+  
+          const weightLifted = initialWeight - finalWeight; // Berat sampah yang diangkat
+  
+          if (weightLifted > 0) {
+            const collectedWeight = currentData?.collectedWeight || 0; // Berat total sebelumnya
+            const updatedCollectedWeight = collectedWeight + weightLifted; // Tambahkan berat yang diangkat
+  
+            // Perbarui collectedWeight di database
+            update(ref(db, `${selectedMarker.name.toLowerCase()}/sensor`), {
+              collectedWeight: updatedCollectedWeight,
+            });
+  
+            // Tampilkan notifikasi berhasil
+            Alert.alert(
+              "Success",
+              `Terima kasih sudah mengangkat sampahnya! Total sampah yang diangkat: ${weightLifted.toFixed(2)} kg`
+            );
+  
+            // Reset state setelah modal ditutup
+            setModalVisible(false);
+            setSelectedMarker(null);
+            setInitialWeight(null); // Reset berat awal untuk tong berikutnya
+          } else {
+            Alert.alert("Error", "Weight lifted must be greater than 0.");
+          }
+        } else {
+          Alert.alert("Error", "Failed to retrieve bin data.");
+        }
+      });
+    }
+  };  
+  
   const handleNavigateToBin = () => {
     if (selectedMarker) {
       const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedMarker.latitude},${selectedMarker.longitude}`;
@@ -84,13 +164,6 @@ const MapComponent = ({ route }) => {
     }
   };
 
-  const handleEmptyBin = () => {
-    if (selectedMarker) {
-      Alert.alert("Empty Bin", "Bin weight has been reset to 0!");
-      setSelectedMarker(null);
-    }
-  };
-
   const handleViewDetails = () => {
     if (selectedMarker) {
       navigation.navigate("BinDetailsPage", { binName: selectedMarker.name.toLowerCase() });
@@ -100,18 +173,20 @@ const MapComponent = ({ route }) => {
 
   const handleLogout = () => {
     const auth = getAuth();
-    signOut(auth).then(() => {
-      console.log('User signed out!');
-      navigation.navigate('Login');
-    }).catch((error) => {
-      console.error('Error signing out: ', error);
-    });
+    signOut(auth)
+      .then(() => {
+        console.log("User signed out!");
+        navigation.navigate("Login");
+      })
+      .catch((error) => {
+        console.error("Error signing out: ", error);
+      });
   };
 
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={handleLogout} style={styles.logoutIcon}>
-          <Icon name="arrow-back" size={24} color="#866A42" />
+        <Icon name="arrow-back" size={24} color="#866A42" />
       </TouchableOpacity>
       <MapView
         ref={mapRef}
@@ -158,25 +233,54 @@ const MapComponent = ({ route }) => {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Popup Modal */}
+      <Modal
+        transparent={true}
+        animationType="fade"
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Silahkan Kosongkan Tempat Sampah</Text>
+            <Text style={styles.modalText}>
+              Berat tempat sampah saat ini: {currentWeight} kg 
+            </Text>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.buttonText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.confirmButton,
+                  !thresholdReached && { backgroundColor: "gray" },
+                ]}
+                onPress={handleConfirmEmptyBin}
+                disabled={!thresholdReached}
+              >
+                <Text style={styles.buttonText}>Konfirmasi</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
-// Add the missing styles
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  map: {
-    width: '100%',
-    height: '100%',
-  },
-  infoContainer: {
-    position: 'absolute',
+  container: { flex: 1 },
+  map: { width: "100%", height: "100%" },
+  infoContainer: { 
+    position: "absolute",
     bottom: 100,
     left: 20,
     right: 20,
-    backgroundColor: '#FFF5E4',
+    backgroundColor: "#FFF5E4",
     padding: 20,
     borderRadius: 10,
     elevation: 5,
@@ -185,32 +289,60 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
   },
-  closeButton: {
-    position: 'absolute',
-    right: 10,
-    top: 10,
-    padding: 5,
+  closeButton: { position: "absolute", right: 10, top: 10, padding: 5 },
+  closeText: { fontSize: 18, fontWeight: "bold" },
+  infoTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 15, textAlign: "center" },
+  infoButton: { backgroundColor: "#6D4C41", padding: 10, borderRadius: 5, marginVertical: 5 },
+  infoButtonText: { color: "white", textAlign: "center", fontSize: 16 },
+  modalBackground: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  closeText: {
+  modalContainer: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.5,
+    elevation: 5,
+  },
+  modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 10,
   },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  infoButton: {
-    backgroundColor: '#6D4C41',
-    padding: 10,
-    borderRadius: 5,
-    marginVertical: 5,
-  },
-  infoButtonText: {
-    color: 'white',
-    textAlign: 'center',
+  modalText: {
     fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  cancelButton: {
+    backgroundColor: '#866A42',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+  },
+  confirmButton: {
+    backgroundColor: '#FFC107',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   logoutIcon: {
     position: 'absolute',
