@@ -2,6 +2,15 @@
   "expo": {
     "name": "Waste Watch",
     "slug": "WasteWatch",
+    "jsEngine": "hermes",
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
+        }
+      ]
+    ],
     "platforms": [
       "ios",
       "android",
