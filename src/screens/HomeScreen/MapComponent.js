@@ -1,35 +1,65 @@
 import React, { useState, useEffect, useRef } from "react";
-import {
-  Alert,
-  Text,
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
+import { 
+  Alert, 
+  Text, 
+  View, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Modal 
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-import * as Linking from "expo-linking";
-import { getDatabase, get, ref, onValue, update } from "firebase/database";
-import { useNavigation } from "@react-navigation/native";
+import MapViewDirections from "react-native-maps-directions";
+import { 
+  getDatabase, 
+  ref, 
+  onValue, 
+  get, 
+  update 
+} from "firebase/database";
+import { 
+  getAuth, 
+  signOut 
+} from "firebase/auth";
+import { 
+  useNavigation, 
+  useIsFocused 
+} from "@react-navigation/native";
 import { app } from "../../firebase/config.js";
-import Icon from "react-native-vector-icons/Ionicons";
-import { getAuth, signOut } from "firebase/auth";
 
 const MapComponent = ({ route }) => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [markers, setMarkers] = useState([]);
+  const [destination, setDestination] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
+  const [showNavigation, setShowNavigation] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [currentWeight, setCurrentWeight] = useState(null);
-  const [thresholdReached, setThresholdReached] = useState(false);
   const [initialWeight, setInitialWeight] = useState(null);
+  const [currentWeight, setCurrentWeight] = useState(0);
+  const [thresholdReached, setThresholdReached] = useState(false);
+
   const navigation = useNavigation();
   const mapRef = useRef(null);
+  const isFocused = useIsFocused();
+
+  // IMPORTANT: Replace with your actual API key or environment variable
+  const GOOGLE_MAPS_APIKEY = 'AIzaSyAJx87nta76WLdlVkvRsYwO3t5mxNxByMc'; 
 
   const initialRegion = {
     latitude: -6.3628,
     longitude: 106.8269,
-    latitudeDelta: 0.02,
-    longitudeDelta: 0.02,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  };
+
+  // Check authentication before performing sensitive actions
+  const checkAuthentication = () => {
+    const auth = getAuth();
+    if (!auth.currentUser) {
+      Alert.alert("Error", "Please log in first");
+      navigation.navigate("Login");
+      return false;
+    }
+    return true;
   };
 
   const resetMapPosition = () => {
@@ -47,45 +77,101 @@ const MapComponent = ({ route }) => {
     const db = getDatabase(app);
     const rootRef = ref(db, "/");
 
-    const unsubscribe = onValue(rootRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const markerData = Object.keys(data)
-          .filter((key) => key.startsWith("tong"))
-          .map((key) => {
-            const sensor = data[key]?.sensor;
-            return {
-              name: key.toUpperCase(),
-              latitude: sensor?.latitude || 0,
-              longitude: sensor?.longitude || 0,
-              battery: sensor?.battery || 0,
-              weight: sensor?.weight || 0,
-            };
-          });
-        setMarkers(markerData);
-      } else {
-        console.log("No data available");
+    const unsubscribe = onValue(
+      rootRef, 
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          const markerData = Object.keys(data)
+            .filter((key) => key.startsWith("tong"))
+            .map((key) => {
+              const sensor = data[key]?.sensor;
+              return {
+                name: key.toUpperCase(),
+                latitude: sensor?.latitude || 0,
+                longitude: sensor?.longitude || 0,
+                battery: sensor?.battery || 0,
+                weight: sensor?.weight || 0,
+              };
+            });
+          setMarkers(markerData);
+        } else {
+          console.log("No data available");
+        }
+      },
+      (error) => {
+        console.error("Firebase database error:", error);
+        Alert.alert("Error", "Failed to fetch bin data");
       }
-    });
+    );
 
     return () => unsubscribe();
   }, []);
 
   const handleMarkerPress = (marker) => {
     setSelectedMarker(marker);
+    setDestination(null);
+    setShowNavigation(false);
+  };
+
+  const handleNavigateToBin = () => {
+    if (!checkAuthentication()) return;
+  
+    if (!selectedMarker) {
+      Alert.alert("Error", "No bin selected.");
+      return;
+    }
+  
+    if (!userLocation) {
+      Alert.alert("Error", "User location is not available.");
+      return;
+    }
+  
+    setDestination({
+      latitude: selectedMarker.latitude,
+      longitude: selectedMarker.longitude,
+    });
+  
+    setShowNavigation(true);
+    setModalVisible(false); // Hide modal when navigating
+    mapRef.current.fitToCoordinates(
+      [
+        userLocation,
+        { latitude: selectedMarker.latitude, longitude: selectedMarker.longitude },
+      ],
+      {
+        edgePadding: {
+          top: 50,
+          right: 50,
+          bottom: 50,
+          left: 50,
+        },
+        animated: true,
+      }
+    );
+  
+    setSelectedMarker(null);
+  };
+
+  const handleGetBinInfo = () => {
+    if (selectedMarker) {
+      navigation.navigate("BinDetailsPage", { binName: selectedMarker.name.toLowerCase() });
+      setSelectedMarker(null);
+    }
   };
 
   const handleEmptyBin = () => {
+    if (!checkAuthentication()) return;
+
     if (selectedMarker) {
       const db = getDatabase(app);
       const binRef = ref(db, `${selectedMarker.name.toLowerCase()}/sensor`);
   
-      // Dapatkan data dari database sekali
       get(binRef).then((snapshot) => {
         if (snapshot.exists()) {
           const weight = snapshot.val()?.weight || 0;
           if (initialWeight === null) {
-            setInitialWeight(weight); // Simpan berat awal hanya sekali
+            setInitialWeight(weight);
           }
         } else {
           Alert.alert("Error", "Data not available.");
@@ -96,78 +182,54 @@ const MapComponent = ({ route }) => {
         if (snapshot.exists()) {
           const weight = snapshot.val()?.weight || 0;
   
-          setCurrentWeight(weight); // Set berat saat ini
-          setThresholdReached(weight < 1); // Cek apakah berat di bawah threshold
+          setCurrentWeight(weight);
+          setThresholdReached(weight < 1);
         } else {
           Alert.alert("Error", "Data not available.");
         }
       });
   
-      setModalVisible(true); // Tampilkan modal
+      setModalVisible(true);
     }
   };
-  
+
   const handleConfirmEmptyBin = () => {
+    if (!checkAuthentication()) return;
+
     if (selectedMarker) {
       const db = getDatabase(app);
       const binRef = ref(db, `${selectedMarker.name.toLowerCase()}/sensor`);
   
-      // Dapatkan data dari database sekali
       get(binRef).then((snapshot) => {
         if (snapshot.exists()) {
           const currentData = snapshot.val();
-          const finalWeight = currentData?.weight || 0; // Berat setelah pengosongan
+          const finalWeight = currentData?.weight || 0;
   
-          const weightLifted = initialWeight - finalWeight; // Berat sampah yang diangkat
+          const weightLifted = initialWeight - finalWeight;
   
           if (weightLifted > 0) {
-            const collectedWeight = currentData?.collectedWeight || 0; // Berat total sebelumnya
-            const updatedCollectedWeight = collectedWeight + weightLifted; // Tambahkan berat yang diangkat
+            const collectedWeight = currentData?.collectedWeight || 0;
+            const updatedCollectedWeight = collectedWeight + weightLifted;
   
-            // Perbarui collectedWeight di database
             update(ref(db, `${selectedMarker.name.toLowerCase()}/sensor`), {
               collectedWeight: updatedCollectedWeight,
             });
   
-            // Tampilkan notifikasi berhasil
             Alert.alert(
               "Success",
-              `Terima kasih sudah mengangkat sampahnya! Total sampah yang diangkat: ${weightLifted.toFixed(2)} kg`
+              `Bin emptied successfully! Total waste collected: ${weightLifted.toFixed(2)} kg`
             );
   
-            // Reset state setelah modal ditutup
             setModalVisible(false);
             setSelectedMarker(null);
-            setInitialWeight(null); // Reset berat awal untuk tong berikutnya
+            setInitialWeight(null);
           } else {
-            Alert.alert("Error", "Weight lifted must be greater than 0.");
+            Alert.alert("Error", "No waste to collect.");
           }
         } else {
           Alert.alert("Error", "Failed to retrieve bin data.");
         }
       });
-    }
-  };  
-  
-  const handleNavigateToBin = () => {
-    if (selectedMarker) {
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedMarker.latitude},${selectedMarker.longitude}`;
-      Linking.openURL(url);
-      setSelectedMarker(null);
-    }
-  };
-
-  const handleGetBinInfo = () => {
-    if (selectedMarker) {
-      Alert.alert("Bin Info", `Details for bin: ${selectedMarker.name}`);
-      setSelectedMarker(null);
-    }
-  };
-
-  const handleViewDetails = () => {
-    if (selectedMarker) {
-      navigation.navigate("BinDetailsPage", { binName: selectedMarker.name.toLowerCase() });
-      setSelectedMarker(null);
     }
   };
 
@@ -183,11 +245,36 @@ const MapComponent = ({ route }) => {
       });
   };
 
+  const clearNavigation = () => {
+    setDestination(null);
+    setSelectedMarker(null);
+    setShowNavigation(false);
+  };
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity
+          onPress={() => {
+            if (showNavigation) {
+              setShowNavigation(false);
+              setDestination(null);
+            } else {
+              navigation.goBack();
+            }
+          }}
+          style={styles.backButton}
+        >
+          <Text style={styles.backText}>{showNavigation ? "Back" : "Close"}</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, showNavigation]);
+  
+  
+
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={handleLogout} style={styles.logoutIcon}>
-        <Icon name="arrow-back" size={24} color="#866A42" />
-      </TouchableOpacity>
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -195,6 +282,10 @@ const MapComponent = ({ route }) => {
         initialRegion={initialRegion}
         showsUserLocation
         showsMyLocationButton
+        onUserLocationChange={(event) => {
+          const { latitude, longitude } = event.nativeEvent.coordinate;
+          setUserLocation({ latitude, longitude });
+        }}
       >
         {markers.map((marker, index) => (
           <Marker
@@ -207,13 +298,48 @@ const MapComponent = ({ route }) => {
             onPress={() => handleMarkerPress(marker)}
           />
         ))}
+
+        {showNavigation && userLocation && destination && (
+          <MapViewDirections
+            origin={userLocation}
+            destination={destination}
+            apikey={GOOGLE_MAPS_APIKEY}
+            strokeWidth={3}
+            strokeColor="hotpink"
+            mode="DRIVING"
+            onError={(errorMessage) => {
+              if (errorMessage.includes("ZERO_RESULTS")) {
+                Alert.alert(
+                  "No Route Found",
+                  "Google Maps couldn't find a route between the selected locations."
+                );
+              } else {
+                Alert.alert("Error", `Directions Error: ${errorMessage}`);
+              }
+            }}
+            onReady={(result) => {
+              mapRef.current.fitToCoordinates(result.coordinates, {
+                edgePadding: {
+                  top: 50,
+                  right: 50,
+                  bottom: 50,
+                  left: 50,
+                },
+                animated: true,
+              });
+            }}
+          />
+        )}
       </MapView>
 
-      {selectedMarker && (
+      {selectedMarker && !showNavigation && (
         <View style={styles.infoContainer}>
           <TouchableOpacity
             style={styles.closeButton}
-            onPress={() => setSelectedMarker(null)}
+            onPress={() => {
+              setSelectedMarker(null);
+              clearNavigation();
+            }}
           >
             <Text style={styles.closeText}>X</Text>
           </TouchableOpacity>
@@ -225,47 +351,46 @@ const MapComponent = ({ route }) => {
           >
             <Text style={styles.infoButtonText}>Navigate to Bin</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.infoButton} onPress={handleViewDetails}>
+          <TouchableOpacity 
+            style={styles.infoButton} 
+            onPress={handleGetBinInfo}
+          >
             <Text style={styles.infoButtonText}>Get Bin Info</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.infoButton} onPress={handleEmptyBin}>
+          <TouchableOpacity 
+            style={styles.infoButton} 
+            onPress={handleEmptyBin}
+          >
             <Text style={styles.infoButtonText}>Empty Bin</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Popup Modal */}
       <Modal
+        animationType="slide"
         transparent={true}
-        animationType="fade"
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalBackground}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Silahkan Kosongkan Tempat Sampah</Text>
-            <Text style={styles.modalText}>
-              Berat tempat sampah saat ini: {currentWeight} kg 
-            </Text>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.buttonText}>Batal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.confirmButton,
-                  !thresholdReached && { backgroundColor: "gray" },
-                ]}
-                onPress={handleConfirmEmptyBin}
-                disabled={!thresholdReached}
-              >
-                <Text style={styles.buttonText}>Konfirmasi</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+        <View style={styles.modalView}>
+          <Text style={styles.modalTitle}>Empty Bin Confirmation</Text>
+          <Text>Initial Weight: {initialWeight} kg</Text>
+          <Text>Current Weight: {currentWeight} kg</Text>
+          {thresholdReached && (
+            <Text style={{color: 'green'}}>Bin is ready to be emptied!</Text>
+          )}
+          <TouchableOpacity 
+            style={styles.modalButton} 
+            onPress={handleConfirmEmptyBin}
+          >
+            <Text style={styles.modalButtonText}>Confirm Empty</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.modalButton} 
+            onPress={() => setModalVisible(false)}
+          >
+            <Text style={styles.modalButtonText}>Cancel</Text>
+          </TouchableOpacity>
         </View>
       </Modal>
     </View>
@@ -273,9 +398,14 @@ const MapComponent = ({ route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  map: { width: "100%", height: "100%" },
-  infoContainer: { 
+  container: {
+    flex: 1,
+  },
+  map: {
+    width: "100%",
+    height: "100%",
+  },
+  infoContainer: {
     position: "absolute",
     bottom: 100,
     left: 20,
@@ -284,76 +414,78 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
   },
-  closeButton: { position: "absolute", right: 10, top: 10, padding: 5 },
-  closeText: { fontSize: 18, fontWeight: "bold" },
-  infoTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 15, textAlign: "center" },
-  infoButton: { backgroundColor: "#6D4C41", padding: 10, borderRadius: 5, marginVertical: 5 },
-  infoButtonText: { color: "white", textAlign: "center", fontSize: 16 },
-  modalBackground: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  closeButton: {
+    position: "absolute",
+    right: 10,
+    top: 10,
+    padding: 5,
   },
-  modalContainer: {
-    width: '80%',
-    backgroundColor: '#fff',
+  closeText: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  infoButton: {
+    backgroundColor: "#6D4C41",
+    padding: 10,
+    borderRadius: 5,
+    marginVertical: 5,
+  },
+  infoButtonText: {
+    color: "white",
+    textAlign: "center",
+    fontSize: 16,
+  },
+  backButton: {
+    paddingLeft: 10,
+  },
+  backText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#007AFF",
+  },
+  modalView: {
+    margin: 20,
+    backgroundColor: 'white',
     borderRadius: 20,
-    padding: 20,
+    padding: 35,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
     shadowOpacity: 0.25,
-    shadowRadius: 3.5,
-    elevation: 5,
+    shadowRadius: 4,
+    elevation: 5
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 15,
   },
-  modalText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  modalButton: {
+    backgroundColor: '#6D4C41',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
     width: '100%',
   },
-  cancelButton: {
-    backgroundColor: '#866A42',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-  },
-  confirmButton: {
-    backgroundColor: '#FFC107',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  logoutIcon: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    zIndex: 10,
-    backgroundColor: '#ffe8ad',
-    borderRadius: 20,
-    padding: 5,
-    elevation: 5,
-  },
+  modalButtonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontSize: 16,
+  }
 });
 
 export default MapComponent;
