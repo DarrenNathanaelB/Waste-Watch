@@ -24,6 +24,7 @@ import {
   useNavigation, 
   useIsFocused 
 } from "@react-navigation/native";
+import * as Location from "expo-location"; // Import expo-location
 import { app } from "../../firebase/config.js";
 
 const MapComponent = ({ route }) => {
@@ -61,6 +62,39 @@ const MapComponent = ({ route }) => {
     }
     return true;
   };
+
+  const requestLocationPermission = async () => {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission Denied",
+        "Location permission is required to use this feature."
+      );
+      return false;
+    }
+
+    const location = await Location.getCurrentPositionAsync({});
+    setUserLocation({
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+    });
+
+    return true;
+  };
+
+  useEffect(() => {
+    const fetchLocation = async () => {
+      const permissionGranted = await requestLocationPermission();
+      if (!permissionGranted) {
+        Alert.alert(
+          "Error",
+          "Please enable location services to use the map functionality."
+        );
+      }
+    };
+
+    fetchLocation();
+  }, []);
 
   const resetMapPosition = () => {
     mapRef.current?.animateToRegion(initialRegion, 1000);
@@ -233,18 +267,6 @@ const MapComponent = ({ route }) => {
     }
   };
 
-  const handleLogout = () => {
-    const auth = getAuth();
-    signOut(auth)
-      .then(() => {
-        console.log("User signed out!");
-        navigation.navigate("Login");
-      })
-      .catch((error) => {
-        console.error("Error signing out: ", error);
-      });
-  };
-
   const clearNavigation = () => {
     setDestination(null);
     setSelectedMarker(null);
@@ -268,8 +290,33 @@ const MapComponent = ({ route }) => {
           <Text style={styles.backText}>{showNavigation ? "Back" : "Close"}</Text>
         </TouchableOpacity>
       ),
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => {
+            if (userLocation) {
+              mapRef.current?.animateToRegion(
+                {
+                  latitude: userLocation.latitude,
+                  longitude: userLocation.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                },
+                1000
+              );
+            } else {
+              Alert.alert(
+                "Error",
+                "User location is not available. Please enable location services."
+              );
+            }
+          }}
+          style={styles.headerButton}
+        >
+          <Text style={styles.headerButtonText}>My Location</Text>
+        </TouchableOpacity>
+      ),
     });
-  }, [navigation, showNavigation]);
+  }, [navigation, showNavigation, userLocation]);  
   
   
 
@@ -405,6 +452,17 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  headerButton: {
+    marginRight: 15,
+    padding: 10,
+    backgroundColor: '#6D4C41',
+    borderRadius: 5,
+  },
+  headerButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },  
   infoContainer: {
     position: "absolute",
     bottom: 100,

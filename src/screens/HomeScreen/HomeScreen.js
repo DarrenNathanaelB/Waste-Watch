@@ -1,6 +1,10 @@
+import * as Location from 'expo-location';
 import React, { useState, useEffect } from 'react';
 import { Text, Image, View, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { getAuth, signOut } from 'firebase/auth';
+import { useNavigation } from '@react-navigation/native';
 import MapComponent from './MapComponent';
 import StatisticsScreen from '../StatisticsScreen/StatisticsScreen';
 import { get, getDatabase, ref, push, set, update } from "firebase/database";
@@ -10,6 +14,17 @@ const Tab = createBottomTabNavigator();
 
 export default function HomeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
+  const navigation = useNavigation();
+
+  const handleLogout = () => {
+    const auth = getAuth();
+    signOut(auth).then(() => {
+      console.log('User signed out!');
+      navigation.navigate('Login');
+    }).catch((error) => {
+      console.error('Error signing out: ', error);
+    });
+  };
 
   // Function to get last update date from Firebase
   const getLastUpdateDate = async () => {
@@ -163,6 +178,11 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+
+      <TouchableOpacity onPress={handleLogout} style={styles.logoutIcon}>
+          <Icon name="arrow-back" size={24} color="#866A42" />
+      </TouchableOpacity>
+
       <Tab.Navigator
         screenOptions={({ navigation, route }) => ({
           headerShown: false,
@@ -322,6 +342,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  logoutIcon: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    zIndex: 10,
+    backgroundColor: '#ffe8ad',
+    borderRadius: 20,
+    padding: 5,
+    elevation: 5,
   },
   modalContainer: {
     width: '80%',
