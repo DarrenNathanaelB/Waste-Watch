@@ -5,7 +5,8 @@ import {
   View, 
   StyleSheet, 
   TouchableOpacity, 
-  Modal 
+  Modal,
+  Linking
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
@@ -37,6 +38,7 @@ const MapComponent = ({ route }) => {
   const [initialWeight, setInitialWeight] = useState(null);
   const [currentWeight, setCurrentWeight] = useState(0);
   const [thresholdReached, setThresholdReached] = useState(false);
+  const [showGoogleMapsButton, setShowGoogleMapsButton] = useState(false);
 
   const navigation = useNavigation();
   const mapRef = useRef(null);
@@ -62,6 +64,31 @@ const MapComponent = ({ route }) => {
     }
     return true;
   };
+
+  const openGoogleMaps = () => {
+    if (!selectedMarker) {
+      Alert.alert("Error", "No marker selected");
+      return;
+    }
+  
+    const { latitude, longitude } = selectedMarker; // Gunakan selectedMarker
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+  
+    Linking.canOpenURL(url)
+      .then((supported) => {
+        if (supported) {
+          return Linking.openURL(url);
+        } else {
+          Alert.alert("Error", "Google Maps app is not installed or cannot be opened.");
+        }
+      })
+      .catch((err) => {
+        console.error("An error occurred", err);
+        Alert.alert("Error", "Could not open Google Maps");
+      });
+  };
+  
+
 
   const requestLocationPermission = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
@@ -146,6 +173,7 @@ const MapComponent = ({ route }) => {
     setSelectedMarker(marker);
     setDestination(null);
     setShowNavigation(false);
+    setShowGoogleMapsButton(true);
   };
 
   const handleNavigateToBin = () => {
@@ -167,7 +195,9 @@ const MapComponent = ({ route }) => {
     });
   
     setShowNavigation(true);
-    setModalVisible(false); // Hide modal when navigating
+    setShowGoogleMapsButton(true); // Ensure this is set to true
+    setModalVisible(false);
+  
     mapRef.current.fitToCoordinates(
       [
         userLocation,
@@ -345,7 +375,7 @@ const MapComponent = ({ route }) => {
             onPress={() => handleMarkerPress(marker)}
           />
         ))}
-
+  
         {showNavigation && userLocation && destination && (
           <MapViewDirections
             origin={userLocation}
@@ -378,41 +408,48 @@ const MapComponent = ({ route }) => {
           />
         )}
       </MapView>
+  
+      {selectedMarker && (
+  <View style={styles.infoContainer}>
+    <TouchableOpacity
+      style={styles.closeButton}
+      onPress={() => {
+        setSelectedMarker(null);
+        clearNavigation();
+      }}
+    >
+      <Text style={styles.closeText}>X</Text>
+    </TouchableOpacity>
 
-      {selectedMarker && !showNavigation && (
-        <View style={styles.infoContainer}>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => {
-              setSelectedMarker(null);
-              clearNavigation();
-            }}
-          >
-            <Text style={styles.closeText}>X</Text>
-          </TouchableOpacity>
+    <Text style={styles.infoTitle}>{selectedMarker.name}</Text>
+    <TouchableOpacity
+      style={styles.infoButton}
+      onPress={handleNavigateToBin}
+    >
+      <Text style={styles.infoButtonText}>Navigate to Bin</Text>
+    </TouchableOpacity>
+    <TouchableOpacity 
+      style={styles.infoButton} 
+      onPress={handleGetBinInfo}
+    >
+      <Text style={styles.infoButtonText}>Get Bin Info</Text>
+    </TouchableOpacity>
+    <TouchableOpacity 
+      style={styles.infoButton} 
+      onPress={handleEmptyBin}
+    >
+      <Text style={styles.infoButtonText}>Empty Bin</Text>
+    </TouchableOpacity>
+    <TouchableOpacity 
+      style={styles.infoButton} 
+      onPress={openGoogleMaps}
+    >
+      <Text style={styles.infoButtonText}>Open in Google Maps</Text>
+    </TouchableOpacity>
+  </View>
+)}
 
-          <Text style={styles.infoTitle}>{selectedMarker.name}</Text>
-          <TouchableOpacity
-            style={styles.infoButton}
-            onPress={handleNavigateToBin}
-          >
-            <Text style={styles.infoButtonText}>Navigate to Bin</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.infoButton} 
-            onPress={handleGetBinInfo}
-          >
-            <Text style={styles.infoButtonText}>Get Bin Info</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.infoButton} 
-            onPress={handleEmptyBin}
-          >
-            <Text style={styles.infoButtonText}>Empty Bin</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
+  
       <Modal
         animationType="slide"
         transparent={true}
@@ -439,10 +476,33 @@ const MapComponent = ({ route }) => {
             <Text style={styles.modalButtonText}>Cancel</Text>
           </TouchableOpacity>
         </View>
+  
+        {showNavigation && (
+  <View style={styles.infoContainer}>
+    <TouchableOpacity
+      style={styles.closeButton}
+      onPress={() => {
+        setShowNavigation(false);
+        setDestination(null);
+        setShowGoogleMapsButton(false);
+      }}
+    >
+      <Text style={styles.closeText}>X</Text>
+    </TouchableOpacity>
+
+    <Text style={styles.infoTitle}>Navigation</Text>
+    <TouchableOpacity
+      style={styles.infoButton}
+      onPress={openGoogleMaps}
+    >
+      <Text style={styles.infoButtonText}>Open in Google Maps</Text>
+    </TouchableOpacity>
+  </View>
+)}
       </Modal>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -463,6 +523,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },  
+  navigationContainer: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
   infoContainer: {
     position: "absolute",
     bottom: 100,
@@ -498,6 +566,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     marginVertical: 5,
+    alignItems: "center",
   },
   infoButtonText: {
     color: "white",
