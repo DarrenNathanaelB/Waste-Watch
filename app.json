@@ -21,14 +21,21 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-    "permissions": ["ACCESS_FINE_LOCATION"],
+    "permissions": [
+      "ACCESS_FINE_LOCATION"
+    ],
     "android": {
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_BACKGROUND_LOCATION"],
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ],
       "config": {
         "googleMaps": {
-          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
-      }
-  }
+          "apiKey": "AIzaSyAJx87nta76WLdlVkvRsYwO3t5mxNxByMc"
+        }
+      },
+      "package": "com.chrissut.WasteWatch"
     },
     "ios": {
       "supportsTablet": true,
@@ -38,6 +45,11 @@
       }
     },
     "description": "Built by the team behind https://www.instamobile.io https://www.iosapptemplates.com https://www.instaflutter.com and https://www.instakotlin.com",
-    "githubUrl": "https://github.com/instamobile/react-native-firebase"
+    "githubUrl": "https://github.com/instamobile/react-native-firebase",
+    "extra": {
+      "eas": {
+        "projectId": "7550eb0b-6d09-4bb0-a079-4924727c59cf"
+      }
+    }
   }
 }

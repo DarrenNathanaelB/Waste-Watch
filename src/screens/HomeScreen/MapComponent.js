@@ -44,7 +44,6 @@ const MapComponent = ({ route }) => {
   const mapRef = useRef(null);
   const isFocused = useIsFocused();
 
-  // IMPORTANT: Replace with your actual API key or environment variable
   const GOOGLE_MAPS_APIKEY = 'AIzaSyAJx87nta76WLdlVkvRsYwO3t5mxNxByMc'; 
 
   const initialRegion = {
